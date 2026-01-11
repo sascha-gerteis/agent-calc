@@ -1,0 +1,2340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Aquaverse Agent Booking Calculator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e5e7eb;
+      --blue: #2563eb;
+      --blue-700: #1d4ed8;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --shadow: 0 8px 30px rgba(2,6,23,.08);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    .calculator-container {
+      max-width: 1200px; margin: 0 auto; padding: 20px;
+      font-family: system-ui,-apple-system,sans-serif; color: var(--text); background: var(--bg);
+    }
+    .card {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 24px; margin-bottom: 20px;
+    }
+    .calculator-grid { display: grid; grid-template-columns: 1fr 350px; gap: 28px; align-items: start; }
+    @media (max-width: 1024px){ .calculator-grid{ grid-template-columns: 1fr; } }
+    .sticky-quote { position: sticky; top: 20px; }
+
+    .form-row{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:16px; }
+    .form-group{ display:flex; flex-direction:column; }
+    label{ font-size:14px; color:var(--muted); margin-bottom:6px; font-weight:500; }
+    input,select{ padding:12px; border:1px solid var(--border); border-radius:8px; font-size:16px; background:#fff; }
+    input:focus,select:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+
+    .package-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin:16px 0; }
+    .package-card{ border:2px solid var(--border); border-radius:12px; padding:16px; cursor:pointer; transition:.2s; background:#fff; position:relative; }
+    .package-card:hover{ border-color:var(--blue); }
+    .package-card.selected{ border-color:var(--blue); background:#eff6ff; }
+    .package-card input[type="radio"]{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+    .package-card h4{ margin:0 0 8px; font-size:18px; }
+    .package-card p{ margin:0; color:var(--muted); font-size:14px; }
+
+    .addon-toggle{ display:flex; justify-content:space-between; align-items:center; padding:16px; border:1px solid var(--border); border-radius:12px; margin-bottom:12px; background:#fff; }
+    .addon-info h4{ margin:0 0 4px; font-size:16px; }
+    .addon-info p{ margin:0; font-size:14px; color:var(--muted); }
+    .addon-controls{ display:flex; gap:12px; align-items:center; }
+
+    .toggle-switch{ width:50px; height:28px; border-radius:14px; background:#e5e7eb; position:relative; cursor:pointer; transition:.2s; }
+    .toggle-switch.active{ background:var(--green); }
+    .toggle-switch::after{ content:''; position:absolute; width:22px; height:22px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    .toggle-switch.active::after{ left:25px; }
+
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:12px 20px; border:1px solid var(--border); border-radius:8px; background:#fff; cursor:pointer; font-weight:600; text-decoration:none; transition:.2s; }
+    .btn-primary{ background:var(--blue); border-color:var(--blue); color:white; }
+    .btn-primary:hover{ background:var(--blue-700); border-color:var(--blue-700); }
+    .btn-success{ background:var(--green); border-color:var(--green); color:white; }
+    .btn-success:hover{ background:#0da371; border-color:#0da371; }
+
+    .quote-table{ width:100%; border-collapse:collapse; margin:16px 0; }
+    .quote-table th,.quote-table td{ padding:12px 8px; text-align:left; border-bottom:1px solid var(--border); }
+    .quote-table th{ background:#f8fafc; font-weight:600; font-size:14px; color:var(--muted); }
+    .quote-table td:last-child,.quote-table th:last-child{ text-align:right; }
+    .quote-total{ font-weight:bold; font-size:18px; border-top:2px solid var(--border); }
+
+    .capacity-indicator{ padding:6px 12px; border-radius:6px; font-size:14px; font-weight:600; margin-top:8px; display:inline-block; }
+    .capacity-good{ background:#dcfce7; color:#166534; }
+    .capacity-limited{ background:#fef3c7; color:#92400e; }
+    .capacity-blackout{ background:#fee2e2; color:#991b1b; }
+
+    .message{ padding:12px 16px; border-radius:8px; margin:16px 0; font-size:14px; }
+    .message.success{ background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+    .message.error{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+    .hidden{ display:none; }
+
+    .agent-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+    }
+
+    .agent-section h2 {
+      color: white;
+      margin-top: 0;
+    }
+
+    .agent-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .agent-control-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .agent-control-group label {
+      color: rgba(255,255,255,0.9);
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .agent-control-group input {
+      padding: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      font-size: 16px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+
+    .agent-control-group input:focus {
+      border-color: white;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.2);
+    }
+
+    .markup-badge {
+      background: var(--green);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .download-section {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .pricing-tier-info {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    .pricing-tier-info h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+    .pricing-tier-info table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    .pricing-tier-info td {
+      padding: 4px 8px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .pricing-tier-info td:last-child {
+      text-align: right;
+      font-weight: 600;
+    }
+
+    /* Buffet Dish Selection Styles */
+    .buffet-section {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .cuisine-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .cuisine-option {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      background: white;
+    }
+
+    .cuisine-option.selected {
+      border-color: var(--blue);
+      background: #eff6ff;
+    }
+
+    .cuisine-option h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .buffet-tier-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .buffet-tier {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      background: white;
+    }
+
+    .buffet-tier.selected {
+      border-color: var(--blue);
+      background: #eff6ff;
+    }
+
+    .buffet-tier h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .buffet-tier p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .buffet-tier .price {
+      font-weight: bold;
+      color: var(--blue);
+      margin-top: 8px;
+    }
+
+    .free-flow-badge {
+      background: var(--green);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+      display: inline-block;
+    }
+
+    .category-section {
+      margin-bottom: 24px;
+    }
+
+    .category-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .category-header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .selection-counter {
+      background: var(--blue);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .dishes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .dishes-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dish-card {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 0;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s;
+      overflow: hidden;
+    }
+
+    .dish-card:hover {
+      border-color: var(--blue);
+      transform: translateY(-2px);
+    }
+
+    .dish-card.selected {
+      border-color: var(--blue);
+      background: #eff6ff;
+    }
+
+    .dish-card.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .dish-image {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+    }
+
+    .dish-content {
+      padding: 16px;
+    }
+
+    .dish-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .dish-name {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .dish-tags {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .dish-tag {
+      background: #f1f5f9;
+      color: var(--muted);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .dish-description {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 8px 0 0 0;
+      line-height: 1.4;
+    }
+
+    .dish-checkbox {
+      display: none;
+    }
+
+    .selection-summary {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .summary-category {
+      margin-bottom: 12px;
+    }
+
+    .summary-category:last-child {
+      margin-bottom: 0;
+    }
+
+    .summary-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .summary-item {
+      background: #f1f5f9;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .luxury-note {
+      background: #dcfce7;
+      color: #166534;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-top: 16px;
+      border: 1px solid #bbf7d0;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    /* Quote Download Styles */
+    .quote-download-section {
+      background: white;
+      border-radius: var(--radius);
+      padding: 24px;
+      border: 1px solid var(--border);
+      margin-top: 20px;
+    }
+
+    .quote-preview {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 16px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .quote-preview h4 {
+      margin: 0 0 16px 0;
+      color: var(--muted);
+    }
+
+    .quote-preview-content {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    /* Print/PDF styles */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #pdf-content, #pdf-content * {
+        visibility: visible;
+      }
+      #pdf-content {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+    }
+  </style>
+  <!-- html2pdf library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <div class="calculator-container">
+    <!-- Agent Controls Section -->
+    <div class="agent-section">
+      <h2>🎪 Aquaverse Agent Portal</h2>
+      <p>Configure your commission and client details below</p>
+      
+      <div class="agent-controls">
+        <div class="agent-control-group">
+          <label for="agentName">Agent Name</label>
+          <input type="text" id="agentName" placeholder="Enter your name" value="John Doe">
+        </div>
+        <div class="agent-control-group">
+          <label for="agencyName">Agency Name</label>
+          <input type="text" id="agencyName" placeholder="Enter agency name" value="Elite Travel Agency">
+        </div>
+        <div class="agent-control-group">
+          <label for="agentMarkup">Agent Markup (%)</label>
+          <input type="number" id="agentMarkup" min="0" max="50" step="0.5" value="10" placeholder="0-50%">
+        </div>
+        <div class="agent-control-group">
+          <label for="clientName">Client Name</label>
+          <input type="text" id="clientName" placeholder="Client/Company name" value="XYZ Corporation">
+        </div>
+      </div>
+    </div>
+
+    <div class="calculator-grid">
+      <div class="main-content">
+        <!-- Step 1 -->
+        <div class="card">
+          <h2 style="margin-top: 0;">1. Date & Attendance</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="eventDate">Event Date</label>
+              <input type="date" id="eventDate" required>
+              <div id="capacityStatus" class="capacity-indicator capacity-good">Select a date</div>
+            </div>
+            <div class="form-group">
+              <label for="arrivalTime">Arrival Time</label>
+              <input type="time" id="arrivalTime" value="10:00">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="adults">Adults</label>
+              <input type="number" id="adults" min="1" value="50">
+            </div>
+            <div class="form-group">
+              <label for="children">Children</label>
+              <input type="number" id="children" min="0" value="30">
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="card">
+          <h2 style="margin-top: 0;">2. Select Package</h2>
+          <div class="package-grid" id="packageGrid">
+            <div class="package-card selected" data-package="day">
+              <input type="radio" name="package" value="day" checked>
+              <h4>Day Pass</h4>
+              <p>10:00–17:00 park access</p>
+              <div style="margin-top: 8px; font-size: 14px; color: var(--muted);">Tiered pricing based on group size</div>
+            </div>
+            <div class="package-card" data-package="vip">
+              <input type="radio" name="package" value="vip">
+              <h4>VIP Hosted</h4>
+              <p>Priority hosting + Cabana</p>
+              <div style="margin-top: 8px; font-size: 14px; color: var(--muted);">From THB 1,690 adult / 1,290 child</div>
+            </div>
+            <div class="package-card" data-package="school">
+              <input type="radio" name="package" value="school">
+              <h4>School Day</h4>
+              <p>Mon–Fri educational rates</p>
+              <div style="margin-top: 8px; font-size: 14px; color: var(--muted);">15% off Day Pass rates</div>
+            </div>
+            <div class="package-card" data-package="gala">
+              <input type="radio" name="package" value="gala">
+              <h4>Gala Dinner</h4>
+              <p>Evening event with dinner</p>
+              <div style="margin-top: 8px; font-size: 14px; color: var(--muted);">Tiered pricing per person</div>
+            </div>
+          </div>
+          
+          <!-- Pricing Tier Information -->
+          <div id="pricingTierInfo" class="pricing-tier-info">
+            <!-- Dynamic content will be inserted here -->
+          </div>
+        </div>
+
+        <!-- Step 3: Add-ons -->
+        <div class="card">
+          <h2 style="margin-top: 0;">3. Add-ons (Optional)</h2>
+
+          <!-- Buffet Toggle -->
+          <div class="addon-toggle">
+            <div class="addon-info">
+              <h4>Custom Buffet</h4>
+              <p>Select individual dishes from our menu</p>
+            </div>
+            <div class="addon-controls">
+              <div class="toggle-switch" data-addon="buffet"></div>
+            </div>
+          </div>
+
+          <!-- Enhanced Buffet Section -->
+          <div id="buffetSection" style="display: none;">
+            <div class="buffet-section">
+              <h3 style="margin-top: 0; margin-bottom: 16px;">Customize Your Buffet</h3>
+              
+              <!-- Cuisine Selection -->
+              <div class="cuisine-selector">
+                <div class="cuisine-option selected" data-cuisine="indian">
+                  <h4>Indian</h4>
+                </div>
+                <div class="cuisine-option" data-cuisine="vegetarian">
+                  <h4>Vegetarian</h4>
+                </div>
+              </div>
+              
+              <!-- Tier Selection -->
+              <div class="buffet-tier-selector">
+                <div class="buffet-tier selected" data-tier="deluxe" data-price="450">
+                  <h4>Deluxe</h4>
+                  <p>2 appetizers • 1 salad • 2 mains • 1 dessert</p>
+                  <div class="price">THB 450/guest</div>
+                </div>
+                <div class="buffet-tier" data-tier="premium" data-price="750">
+                  <h4>Premium</h4>
+                  <p>3 appetizers • 2 soups • 2 salads • 3 mains • 1 dessert</p>
+                  <div class="price">THB 750/guest</div>
+                </div>
+                <div class="buffet-tier" data-tier="luxury" data-price="950">
+                  <h4>Luxury</h4>
+                  <p>3 appetizers • 1 soup • 2 salads • 5 mains • 2 desserts</p>
+                  <div class="price">THB 950/guest</div>
+                  <div class="free-flow-badge">Free Flow Soft Drinks Included</div>
+                </div>
+              </div>
+
+              <!-- Luxury Package Note -->
+              <div id="luxuryNote" class="luxury-note hidden">
+                🥤 <strong>Free Flow Soft Drinks Included</strong> - Unlimited Coca-Cola, Sprite, Fanta, and drinking water
+              </div>
+
+              <!-- Dish Selection by Category -->
+              <div id="dishSelection">
+                <!-- Categories will be populated by JavaScript -->
+              </div>
+
+              <!-- Selection Summary -->
+              <div class="selection-summary">
+                <h4 style="margin-top: 0;">Your Selection</h4>
+                <div id="selectionSummary">
+                  <!-- Summary will be populated by JavaScript -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Existing add-ons -->
+          <div class="addon-toggle">
+            <div class="addon-info">
+              <h4>Meal Vouchers</h4>
+              <p>Food credit per person</p>
+            </div>
+            <div class="addon-controls">
+              <select id="mealValue" style="width: 120px;">
+                <option value="150">THB 150</option>
+                <option value="250">THB 250</option>
+              </select>
+              <div class="toggle-switch" data-addon="meal"></div>
+            </div>
+          </div>
+
+          <div class="addon-toggle">
+            <div class="addon-info">
+              <h4>Private Cabanas</h4>
+              <p>Shaded VIP areas</p>
+            </div>
+            <div class="addon-controls">
+              <input type="number" id="cabanaCount" min="0" value="2" style="width: 80px;">
+              <div class="toggle-switch" data-addon="cabanas"></div>
+            </div>
+          </div>
+
+          <div class="addon-toggle">
+            <div class="addon-info">
+              <h4>Coach Transfer</h4>
+              <p>Bangkok ⇄ Aquaverse</p>
+            </div>
+            <div class="addon-controls">
+              <select id="coachCount" style="width: 120px;">
+                <option value="3500">1 coach</option>
+                <option value="7000">2 coaches</option>
+                <option value="10500">3 coaches</option>
+              </select>
+              <div class="toggle-switch" data-addon="transfer"></div>
+            </div>
+          </div>
+
+          <div class="addon-toggle">
+            <div class="addon-info">
+              <h4>Event Photographer</h4>
+              <p>Professional event coverage</p>
+            </div>
+            <div class="addon-controls">
+              <select id="photoPackage" style="width: 120px;">
+                <option value="6000">Half day</option>
+                <option value="10000">Full day</option>
+              </select>
+              <div class="toggle-switch" data-addon="photo"></div>
+            </div>
+          </div>
+
+          <!-- DJ Add-on -->
+          <div class="addon-toggle">
+            <div class="addon-info">
+              <h4>DJ Service</h4>
+              <p>Professional music and entertainment</p>
+            </div>
+            <div class="addon-controls">
+              <div class="toggle-switch" data-addon="dj"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Download Section -->
+        <div class="card">
+          <h2 style="margin-top: 0;">4. Generate Client Quote</h2>
+          <div class="quote-download-section">
+            <div class="download-section">
+              <button id="generateQuote" class="btn btn-primary">📋 Generate Quote Preview</button>
+              <button id="downloadPDF" class="btn btn-success">📥 Download as PDF</button>
+              <button id="sendEmail" class="btn">📧 Send to Client</button>
+            </div>
+            
+            <div id="quotePreview" class="quote-preview hidden">
+              <h4>Quote Preview</h4>
+              <div id="quotePreviewContent" class="quote-preview-content">
+                <!-- Quote content will be inserted here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quote Sidebar -->
+      <div class="sticky-quote">
+        <div class="card">
+          <h3 style="margin-top: 0;">Quote Summary</h3>
+          <div style="font-size: 14px; color: var(--muted); margin-bottom: 16px;">
+            Reference: <span id="quoteRef">AQ-AGENT-001</span>
+            <div style="margin-top: 4px;">Markup: <span id="markupDisplay">10%</span></div>
+          </div>
+          <table class="quote-table">
+            <thead>
+              <tr><th>Item</th><th>Qty</th><th>Total</th></tr>
+            </thead>
+            <tbody id="quoteItems">
+              <tr><td>Day Pass</td><td>80</td><td>THB 67,200</td></tr>
+            </tbody>
+            <tfoot>
+              <tr><td><strong>Subtotal</strong></td><td></td><td id="subtotal"><strong>THB 67,200</strong></td></tr>
+              <tr><td>Volume Discount</td><td></td><td id="discount" style="color: var(--green);">-THB 3,360</td></tr>
+              <tr id="markupRow"><td>Agent Markup (<span id="markupPercent">10%</span>)</td><td></td><td id="markupAmount" style="color: var(--purple);">+THB 6,384</td></tr>
+              <tr><td>VAT (7%)</td><td></td><td id="vat">THB 4,915</td></tr>
+              <tr class="quote-total"><td><strong>Total</strong></td><td></td><td id="total"><strong>THB 75,139</strong></td></tr>
+              <tr><td style="color: var(--muted);">Per Person</td><td></td><td id="perPerson" style="color: var(--muted);">THB 939</td></tr>
+              <tr><td style="color: var(--muted);">Agent Commission</td><td></td><td id="commission" style="color: var(--green);">THB 6,384</td></tr>
+            </tfoot>
+          </table>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 12px;">
+            * Quote includes agent markup
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden PDF Content Container -->
+  <div id="pdf-content" style="display: none;"></div>
+
+<script >
+// Menu Data
+const MENU_DATA = {
+  indian: {
+    appetizers: [
+      {
+        id: 'onion-bhaji',
+        name: 'Onion Bhaji',
+        description: 'Crispy fried onion fritters',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759718656/onion-bhaji-with-mint-dipping-sauce-546250_1200x_wis1jo.webp',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'paneer-tikka',
+        name: 'Paneer Tikka',
+        description: 'Grilled cottage cheese with spices',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759718910/istockphoto-1186759790-612x612_fmz6ln.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'aloo-tikki',
+        name: 'Aloo Tikki',
+        description: 'Spiced potato patties',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977634/aloo-tikki-featured_vfzl1n.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'bread-pakora',
+        name: 'Bread Pakora',
+        description: 'Bread slices dipped in chickpea batter and fried',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759719030/indian-fried-snack-bread-pakora_55610-3247_upo74z.avif',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'chaat',
+        name: 'Chaat',
+        description: 'Savory street food snack',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977699/samosa-chaat-1_lkkopb.webp',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['luxury']
+      },
+      {
+        id: 'idli',
+        name: 'Idli',
+        description: 'Steamed rice cakes',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977734/27bd82a56e68f12a1eadf247e0e374773a52f08b_nnidum.avif',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['luxury']
+      },
+      {
+        id: 'sambar',
+        name: 'Sambar',
+        description: 'Lentil-based vegetable stew',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977771/Sambar-2-3_vmlg8k.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['luxury']
+      },
+      {
+        id: 'chicken-tikka',
+        name: 'Chicken Tikka',
+        description: 'Tandoori grilled chicken pieces',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759723704/deliciously-spiced-chicken-tikka-kabab-600nw-2495838045_cmqw6p.webp',
+        tags: ['🍗 Chicken'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'chicken-65',
+        name: 'Chicken 65',
+        description: 'Spicy deep-fried chicken',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977839/Chicken-65-11_ddsul2.jpg',
+        tags: ['🍗 Chicken', '🔥 Spicy'],
+        availableIn: ['premium', 'luxury']
+      }
+    ],
+    soups: [
+      {
+        id: 'corn-soup',
+        name: 'Corn Soup',
+        description: 'Creamy sweet corn soup',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759724452/istockphoto-490027514-612x612_ipdagr.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'carrot-ginger-soup',
+        name: 'Carrot Ginger Soup',
+        description: 'Fresh carrots with ginger',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977908/834782-1-eng-GB_carrot-and-ginger-soup-768x960_rqoalz.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'vegetable-tom-yum',
+        name: 'Vegetable Tom Yum Soup',
+        description: 'Spicy Thai-inspired vegetable soup',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759724576/Vegan-Tom-Yum-Soup-0-4X5-500x500_s15xoc.jpg',
+        tags: ['🌱 Vegetarian', '🔥 Spicy'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'gujarati-kadhi',
+        name: 'Gujarati Kadhi',
+        description: 'Yogurt-based curry soup',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977952/Gujarati-Kadhi-Piping-Pot-Curry-2-copy_qwxk4x.webp',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['luxury']
+      }
+    ],
+    salads: [
+      {
+        id: 'mixed-green-salad',
+        name: 'Mixed Green Salad',
+        description: 'Fresh greens with house dressing',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977988/MixedGreensKey_tzyomd.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'kuchumber-salad',
+        name: 'Kuchumber Salad',
+        description: 'Traditional Indian cucumber salad',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978028/kachumber-salad-recipe_rtrm5l.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'paneer-tikka-salad',
+        name: 'Paneer Tikka Salad',
+        description: 'Grilled paneer with mixed greens',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978077/17-minute-tandoori-paneer-with-salad-and-raita-p38-154461-3_dpufa0.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      }
+    ],
+    mains: [
+      {
+        id: 'khichdi',
+        name: 'Khichdi',
+        description: 'Comforting rice and lentil dish',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978124/Yellow-Moong-Dal-Khichdi-Recipe_plgkuo.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'kadai-paneer',
+        name: 'Kadai Paneer',
+        description: 'Paneer in spicy gravy with bell peppers',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978151/Best-Kadai-Paneer-Recipe_yhadqg.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'palak-paneer',
+        name: 'Palak Paneer',
+        description: 'Cottage cheese in spinach gravy',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978194/Palak-Paneer-1-e1722864315381_y99vuh.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'dal-makhani',
+        name: 'Dal Makhani',
+        description: 'Creamy black lentil curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978222/Dal-Makhani_iovn1f.webp',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'yellow-dal',
+        name: 'Yellow Dal',
+        description: 'Traditional lentil curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978264/Dal-Tadka-Featured_zr1vta.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'tandoori-mushroom',
+        name: 'Tandoori Mushroom',
+        description: 'Grilled mushrooms with spices',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978294/Tandoori-Mushroom-Tikka-Air-Fryer-indian-recipe-Piping-Pot-Curry_c5bhdk.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'achari-paneer',
+        name: 'Achari Paneer Tikka',
+        description: 'Paneer in pickled spice marinade',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978323/Achari_Paneer_Tikka_Recipe_Party_Food_ipzqnn.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'moong-dal',
+        name: 'Moong Dal',
+        description: 'Yellow lentil curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978357/lehsuni-moong-dal-recipe_r3s1uj.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'chickpea-potato',
+        name: 'Chickpeas and Potato Curry',
+        description: 'Hearty chickpea and potato dish',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978381/images_eibsa7.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'aloo-mutter',
+        name: 'Aloo Mutter',
+        description: 'Peas and potato curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978431/Easy-Aloo-Matar_lridg5.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'okra-curry',
+        name: 'Okra Curry',
+        description: 'Spiced okra preparation',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978461/Lentil-Okra-Curry-kitchenconfidante.com-9138_znwdnu.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'chana-masala',
+        name: 'Chana Masala',
+        description: 'Spicy chickpea curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978492/Chana-Masala-Featured_giy05m.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'eggplant-curry',
+        name: 'Eggplant Curry',
+        description: 'Brinjal in spicy gravy',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978565/aubergine-curry-recipe-vert_yq7fn6.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'bhindi',
+        name: 'Bhindi',
+        description: 'Stir-fried okra with spices',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978588/bhindi-fry-500x375_bueo0k.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'pav-bhaji',
+        name: 'Pav Bhaji',
+        description: 'Spiced vegetable mash with bread',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978646/unnamed_mtyxqo.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'mutter-curry',
+        name: 'Mutter Curry',
+        description: 'Peas in tomato-based gravy',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978690/hq720_g5bj9x.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'mix-veg',
+        name: 'Mix Veg',
+        description: 'Mixed vegetables in curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978728/images_gp9r7q.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'chicken-tikka-masala',
+        name: 'Chicken Tikka Masala',
+        description: 'Grilled chicken in creamy tomato sauce',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978769/Chicken-Tikka-Masala-blog_qw3qug.jpg',
+        tags: ['🍗 Chicken'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'fish-curry',
+        name: 'Fish Curry',
+        description: 'Fish in spicy coconut gravy',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978792/IMG_4409-edited_odpllq.jpg',
+        tags: ['🐟 Fish'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'butter-chicken',
+        name: 'Butter Chicken',
+        description: 'Creamy tomato-based chicken curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978829/butter-chicken-gordon-ramsay_uyw4pq.jpg',
+        tags: ['🍗 Chicken'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'chicken-malai-tikka',
+        name: 'Chicken Malai Tikka',
+        description: 'Creamy marinated chicken',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978859/Chicken-Malai-Tikka-Murg-Malai-Kebabs8_m0cc44.jpg',
+        tags: ['🍗 Chicken'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'tandoori-chicken',
+        name: 'Tandoori Chicken',
+        description: 'Classic grilled chicken',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978890/1200-by-1200-images-2_fhdvjo.jpg',
+        tags: ['🍗 Chicken'],
+        availableIn: ['premium', 'luxury']
+      }
+    ],
+    desserts: [
+      {
+        id: 'seasonal-fruit',
+        name: 'Seasonal Fruit',
+        description: 'Fresh local fruit selection',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978936/Catering-Platters-Gourmet-Seasonal-Fruit-Platter-1_qc3oao.jpg',
+        tags: ['🌱 Vegan'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'chocolate-brownie',
+        name: 'Chocolate Brownie',
+        description: 'Rich dark chocolate brownies',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978963/Brownie-Recipe-with-Cocoa-Powder-821x821_upcidy.jpg',
+        tags: ['🍫 Chocolate'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'mango-sticky-rice',
+        name: 'Mango Sticky Rice',
+        description: 'Sweet mango with coconut rice',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759979003/R00126_Mango-Sticky-Rice_w3ogap.jpg',
+        tags: ['🍚 Gluten Free'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'tiramisu',
+        name: 'Tiramisu Cups',
+        description: 'Coffee-flavored Italian dessert',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759979033/Tiramisu-Cups_ni87j4.jpg',
+        tags: ['☕ Coffee'],
+        availableIn: ['luxury']
+      }
+    ]
+  },
+  vegetarian: {
+    appetizers: [
+      {
+        id: 'onion-bhaji',
+        name: 'Onion Bhaji',
+        description: 'Crispy fried onion fritters',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759718656/onion-bhaji-with-mint-dipping-sauce-546250_1200x_wis1jo.webp',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'paneer-tikka',
+        name: 'Paneer Tikka',
+        description: 'Grilled cottage cheese with spices',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759718910/istockphoto-1186759790-612x612_fmz6ln.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'aloo-tikki',
+        name: 'Aloo Tikki',
+        description: 'Spiced potato patties',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977634/aloo-tikki-featured_vfzl1n.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'bread-pakora',
+        name: 'Bread Pakora',
+        description: 'Bread slices dipped in chickpea batter and fried',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759719030/indian-fried-snack-bread-pakora_55610-3247_upo74z.avif',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'chaat',
+        name: 'Chaat',
+        description: 'Savory street food snack',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977699/samosa-chaat-1_lkkopb.webp',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['luxury']
+      },
+      {
+        id: 'idli',
+        name: 'Idli',
+        description: 'Steamed rice cakes',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977734/27bd82a56e68f12a1eadf247e0e374773a52f08b_nnidum.avif',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['luxury']
+      },
+      {
+        id: 'sambar',
+        name: 'Sambar',
+        description: 'Lentil-based vegetable stew',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977771/Sambar-2-3_vmlg8k.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['luxury']
+      }
+    ],
+    soups: [
+      {
+        id: 'corn-soup',
+        name: 'Corn Soup',
+        description: 'Creamy sweet corn soup',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759724452/istockphoto-490027514-612x612_ipdagr.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'carrot-ginger-soup',
+        name: 'Carrot Ginger Soup',
+        description: 'Fresh carrots with ginger',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977908/834782-1-eng-GB_carrot-and-ginger-soup-768x960_rqoalz.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'vegetable-tom-yum',
+        name: 'Vegetable Tom Yum Soup',
+        description: 'Spicy Thai-inspired vegetable soup',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759724576/Vegan-Tom-Yum-Soup-0-4X5-500x500_s15xoc.jpg',
+        tags: ['🌱 Vegetarian', '🔥 Spicy'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'gujarati-kadhi',
+        name: 'Gujarati Kadhi',
+        description: 'Yogurt-based curry soup',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977952/Gujarati-Kadhi-Piping-Pot-Curry-2-copy_qwxk4x.webp',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['luxury']
+      }
+    ],
+    salads: [
+      {
+        id: 'mixed-green-salad',
+        name: 'Mixed Green Salad',
+        description: 'Fresh greens with house dressing',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759977988/MixedGreensKey_tzyomd.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'kuchumber-salad',
+        name: 'Kuchumber Salad',
+        description: 'Traditional Indian cucumber salad',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978028/kachumber-salad-recipe_rtrm5l.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'paneer-tikka-salad',
+        name: 'Paneer Tikka Salad',
+        description: 'Grilled paneer with mixed greens',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978077/17-minute-tandoori-paneer-with-salad-and-raita-p38-154461-3_dpufa0.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      }
+    ],
+    mains: [
+      {
+        id: 'khichdi',
+        name: 'Khichdi',
+        description: 'Comforting rice and lentil dish',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978124/Yellow-Moong-Dal-Khichdi-Recipe_plgkuo.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'kadai-paneer',
+        name: 'Kadai Paneer',
+        description: 'Paneer in spicy gravy with bell peppers',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978151/Best-Kadai-Paneer-Recipe_yhadqg.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'palak-paneer',
+        name: 'Palak Paneer',
+        description: 'Cottage cheese in spinach gravy',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978194/Palak-Paneer-1-e1722864315381_y99vuh.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'dal-makhani',
+        name: 'Dal Makhani',
+        description: 'Creamy black lentil curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978222/Dal-Makhani_iovn1f.webp',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'yellow-dal',
+        name: 'Yellow Dal',
+        description: 'Traditional lentil curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978264/Dal-Tadka-Featured_zr1vta.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'tandoori-mushroom',
+        name: 'Tandoori Mushroom',
+        description: 'Grilled mushrooms with spices',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978294/Tandoori-Mushroom-Tikka-Air-Fryer-indian-recipe-Piping-Pot-Curry_c5bhdk.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'achari-paneer',
+        name: 'Achari Paneer Tikka',
+        description: 'Paneer in pickled spice marinade',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978323/Achari_Paneer_Tikka_Recipe_Party_Food_ipzqnn.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'moong-dal',
+        name: 'Moong Dal',
+        description: 'Yellow lentil curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978357/lehsuni-moong-dal-recipe_r3s1uj.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'chickpea-potato',
+        name: 'Chickpeas and Potato Curry',
+        description: 'Hearty chickpea and potato dish',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978381/images_eibsa7.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'aloo-mutter',
+        name: 'Aloo Mutter',
+        description: 'Peas and potato curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978431/Easy-Aloo-Matar_lridg5.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'okra-curry',
+        name: 'Okra Curry',
+        description: 'Spiced okra preparation',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978461/Lentil-Okra-Curry-kitchenconfidante.com-9138_znwdnu.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'chana-masala',
+        name: 'Chana Masala',
+        description: 'Spicy chickpea curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978492/Chana-Masala-Featured_giy05m.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'eggplant-curry',
+        name: 'Eggplant Curry',
+        description: 'Brinjal in spicy gravy',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978565/aubergine-curry-recipe-vert_yq7fn6.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'bhindi',
+        name: 'Bhindi',
+        description: 'Stir-fried okra with spices',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978588/bhindi-fry-500x375_bueo0k.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'pav-bhaji',
+        name: 'Pav Bhaji',
+        description: 'Spiced vegetable mash with bread',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978646/unnamed_mtyxqo.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'mutter-curry',
+        name: 'Mutter Curry',
+        description: 'Peas in tomato-based gravy',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978690/hq720_g5bj9x.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'mix-veg',
+        name: 'Mix Veg',
+        description: 'Mixed vegetables in curry',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978728/images_gp9r7q.jpg',
+        tags: ['🌱 Vegetarian'],
+        availableIn: ['premium', 'luxury']
+      }
+    ],
+    desserts: [
+      {
+        id: 'seasonal-fruit',
+        name: 'Seasonal Fruit',
+        description: 'Fresh local fruit selection',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978936/Catering-Platters-Gourmet-Seasonal-Fruit-Platter-1_qc3oao.jpg',
+        tags: ['🌱 Vegan'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'chocolate-brownie',
+        name: 'Chocolate Brownie',
+        description: 'Rich dark chocolate brownies',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759978963/Brownie-Recipe-with-Cocoa-Powder-821x821_upcidy.jpg',
+        tags: ['🍫 Chocolate'],
+        availableIn: ['deluxe', 'premium', 'luxury']
+      },
+      {
+        id: 'mango-sticky-rice',
+        name: 'Mango Sticky Rice',
+        description: 'Sweet mango with coconut rice',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759979003/R00126_Mango-Sticky-Rice_w3ogap.jpg',
+        tags: ['🍚 Gluten Free'],
+        availableIn: ['premium', 'luxury']
+      },
+      {
+        id: 'tiramisu',
+        name: 'Tiramisu Cups',
+        description: 'Coffee-flavored Italian dessert',
+        image: 'https://res.cloudinary.com/dbjlajbae/image/upload/v1759979033/Tiramisu-Cups_ni87j4.jpg',
+        tags: ['☕ Coffee'],
+        availableIn: ['luxury']
+      }
+    ]
+  }
+};
+
+// Tier limits
+const TIER_LIMITS = {
+  deluxe: { appetizers: 2, soups: 0, salads: 1, mains: 2, desserts: 1 },
+  premium: { appetizers: 3, soups: 2, salads: 2, mains: 3, desserts: 1 },
+  luxury: { appetizers: 3, soups: 1, salads: 2, mains: 5, desserts: 2 }
+};
+
+// Pricing Structure
+const PRICING_STRUCTURE = {
+  gala: [
+    { min: 50, max: 99, price: 1290 },
+    { min: 100, max: 299, price: 1190 },
+    { min: 300, max: 499, price: 1090 },
+    { min: 500, max: 699, price: 990 },
+    { min: 700, max: 999, price: 950 },
+    { min: 1000, max: Infinity, price: 890 }
+  ],
+  
+  dayAdult: [
+    { min: 30, max: 299, price: 1190 },
+    { min: 300, max: 499, price: 1090 },
+    { min: 500, max: 999, price: 990 },
+    { min: 1000, max: 1999, price: 890 },
+    { min: 2000, max: Infinity, price: 790 }
+  ],
+  
+  dayChild: [
+    { min: 30, max: 299, price: 1090 },
+    { min: 300, max: 499, price: 990 },
+    { min: 500, max: 999, price: 890 },
+    { min: 1000, max: 1999, price: 790 },
+    { min: 2000, max: Infinity, price: 690 }
+  ],
+  
+  schoolAdult: [
+    { min: 30, max: 299, price: 1012 },
+    { min: 300, max: 499, price: 927 },
+    { min: 500, max: 999, price: 842 },
+    { min: 1000, max: 1999, price: 757 },
+    { min: 2000, max: Infinity, price: 672 }
+  ],
+  
+  schoolChild: [
+    { min: 30, max: 299, price: 927 },
+    { min: 300, max: 499, price: 842 },
+    { min: 500, max: 999, price: 757 },
+    { min: 1000, max: 1999, price: 672 },
+    { min: 2000, max: Infinity, price: 587 }
+  ],
+  
+  vip: { adult: 1690, child: 1290 }
+};
+
+// State management
+const state = {
+  addons: { 
+    meal: false, 
+    cabanas: false, 
+    transfer: false, 
+    photo: false,
+    buffet: false,
+    dj: false
+  },
+  buffet: {
+    cuisine: 'indian',
+    tier: 'deluxe',
+    price: 450,
+    selectedDishes: {
+      appetizers: [],
+      soups: [],
+      salads: [],
+      mains: [],
+      desserts: []
+    }
+  },
+  agentMarkup: 10,
+  agentName: 'John Doe',
+  agencyName: 'Elite Travel Agency',
+  clientName: 'XYZ Corporation'
+};
+
+// Global quote data storage
+let quoteData = {
+  items: [],
+  subtotal: 0,
+  discount: 0,
+  markupAmount: 0,
+  vat: 0,
+  total: 0,
+  guests: 0,
+  adults: 0,
+  children: 0,
+  selectedPackage: ''
+};
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('eventDate').min = tomorrow.toISOString().split('T')[0];
+  // Set default date to tomorrow
+  document.getElementById('eventDate').value = tomorrow.toISOString().split('T')[0];
+  
+  setupEventListeners();
+  updateQuote();
+  updatePricingInfo();
+});
+
+function setupEventListeners() {
+  // Package selection
+  document.querySelectorAll('.package-card').forEach(card => {
+    card.addEventListener('click', function() {
+      document.querySelectorAll('.package-card').forEach(c => c.classList.remove('selected'));
+      this.classList.add('selected');
+      updateQuote();
+      updatePricingInfo();
+    });
+  });
+
+  // Add-on toggles
+  document.querySelectorAll('.toggle-switch').forEach(toggle => {
+    toggle.addEventListener('click', function() {
+      const addon = this.dataset.addon;
+      state.addons[addon] = !state.addons[addon];
+      this.classList.toggle('active', state.addons[addon]);
+      
+      if (addon === 'buffet') {
+        const buffetSection = document.getElementById('buffetSection');
+        buffetSection.style.display = state.addons.buffet ? 'block' : 'none';
+        
+        if (state.addons.buffet) {
+          initializeBuffetSection();
+        }
+      }
+      
+      updateQuote();
+    });
+  });
+
+  // Agent controls
+  document.getElementById('agentMarkup').addEventListener('input', function() {
+    state.agentMarkup = parseFloat(this.value) || 0;
+    document.getElementById('markupDisplay').textContent = `${state.agentMarkup}%`;
+    document.getElementById('markupPercent').textContent = `${state.agentMarkup}%`;
+    updateQuote();
+  });
+
+  document.getElementById('agentName').addEventListener('input', function() {
+    state.agentName = this.value;
+  });
+
+  document.getElementById('agencyName').addEventListener('input', function() {
+    state.agencyName = this.value;
+  });
+
+  document.getElementById('clientName').addEventListener('input', function() {
+    state.clientName = this.value;
+  });
+
+  // Cuisine selection
+  document.querySelectorAll('.cuisine-option').forEach(option => {
+    option.addEventListener('click', function() {
+      document.querySelectorAll('.cuisine-option').forEach(o => o.classList.remove('selected'));
+      this.classList.add('selected');
+      
+      state.buffet.cuisine = this.dataset.cuisine;
+      state.buffet.selectedDishes = { appetizers: [], soups: [], salads: [], mains: [], desserts: [] };
+      
+      renderDishSelection();
+      updateQuote();
+    });
+  });
+
+  // Buffet tier selection
+  document.querySelectorAll('.buffet-tier').forEach(tier => {
+    tier.addEventListener('click', function() {
+      if (this.classList.contains('selected')) return;
+      
+      document.querySelectorAll('.buffet-tier').forEach(t => t.classList.remove('selected'));
+      this.classList.add('selected');
+      
+      state.buffet.tier = this.dataset.tier;
+      state.buffet.price = parseInt(this.dataset.price);
+      
+      const luxuryNote = document.getElementById('luxuryNote');
+      luxuryNote.classList.toggle('hidden', state.buffet.tier !== 'luxury');
+      
+      state.buffet.selectedDishes = { appetizers: [], soups: [], salads: [], mains: [], desserts: [] };
+      
+      renderDishSelection();
+      updateQuote();
+    });
+  });
+
+  // Form inputs
+  const pricingInputs = ['adults', 'children', 'mealValue', 'cabanaCount', 'coachCount', 'photoPackage', 'eventDate', 'arrivalTime'];
+  pricingInputs.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener('input', function() {
+        updateQuote();
+        updatePricingInfo();
+      });
+      element.addEventListener('change', function() {
+        updateQuote();
+        updatePricingInfo();
+      });
+    }
+  });
+
+  // Download buttons
+  document.getElementById('generateQuote').addEventListener('click', generateQuotePreview);
+  document.getElementById('downloadPDF').addEventListener('click', downloadPDF);
+  document.getElementById('sendEmail').addEventListener('click', sendEmail);
+}
+
+function updatePricingInfo() {
+  const adults = parseInt(document.getElementById('adults').value) || 0;
+  const children = parseInt(document.getElementById('children').value) || 0;
+  const totalGuests = adults + children;
+  const selectedPackage = document.querySelector('.package-card.selected').dataset.package;
+  
+  const infoContainer = document.getElementById('pricingTierInfo');
+  
+  if (selectedPackage === 'gala') {
+    const galaPrice = getPriceForTier('gala', totalGuests);
+    infoContainer.innerHTML = `
+      <h4>Gala Dinner Pricing</h4>
+      <p>Flat rate per person (adults & children):</p>
+      <table>
+        <tr><td>50-99 people:</td><td>THB 1,290</td></tr>
+        <tr><td>100-299 people:</td><td>THB 1,190</td></tr>
+        <tr><td>300-499 people:</td><td>THB 1,090</td></tr>
+        <tr><td>500-699 people:</td><td>THB 990</td></tr>
+        <tr><td>700-999 people:</td><td>THB 950</td></tr>
+        <tr><td>1000+ people:</td><td>THB 890</td></tr>
+      </table>
+      <p style="margin-top: 8px;"><strong>Your group (${totalGuests} people): THB ${galaPrice}/person</strong></p>
+    `;
+  } else if (selectedPackage === 'day') {
+    const adultPrice = getPriceForTier('dayAdult', totalGuests);
+    const childPrice = getPriceForTier('dayChild', totalGuests);
+    
+    infoContainer.innerHTML = `
+      <h4>Day Pass Pricing</h4>
+      <p>Tiered pricing based on total group size:</p>
+      <table>
+        <tr><td>30-299 people:</td><td>Adult THB 1,190 / Child THB 1,090</td></tr>
+        <tr><td>300-499 people:</td><td>Adult THB 1,090 / Child THB 990</td></tr>
+        <tr><td>500-999 people:</td><td>Adult THB 990 / Child THB 890</td></tr>
+        <tr><td>1000-1999 people:</td><td>Adult THB 890 / Child THB 790</td></tr>
+        <tr><td>2000+ people:</td><td>Adult THB 790 / Child THB 690</td></tr>
+      </table>
+      <p style="margin-top: 8px;"><strong>Your group (${totalGuests} people): Adult THB ${adultPrice} / Child THB ${childPrice}</strong></p>
+    `;
+  } else if (selectedPackage === 'school') {
+    const adultPrice = getPriceForTier('schoolAdult', totalGuests);
+    const childPrice = getPriceForTier('schoolChild', totalGuests);
+    
+    infoContainer.innerHTML = `
+      <h4>School Day Pricing (15% off Day Pass rates)</h4>
+      <p>Tiered pricing based on total group size:</p>
+      <table>
+        <tr><td>30-299 people:</td><td>Adult THB 1,012 / Child THB 927</td></tr>
+        <tr><td>300-499 people:</td><td>Adult THB 927 / Child THB 842</td></tr>
+        <tr><td>500-999 people:</td><td>Adult THB 842 / Child THB 757</td></tr>
+        <tr><td>1000-1999 people:</td><td>Adult THB 757 / Child THB 672</td></tr>
+        <tr><td>2000+ people:</td><td>Adult THB 672 / Child THB 587</td></tr>
+      </table>
+      <p style="margin-top: 8px;"><strong>Your group (${totalGuests} people): Adult THB ${adultPrice} / Child THB ${childPrice}</strong></p>
+    `;
+  } else if (selectedPackage === 'vip') {
+    infoContainer.innerHTML = `
+      <h4>VIP Hosted Pricing</h4>
+      <p>Fixed pricing regardless of group size:</p>
+      <table>
+        <tr><td>Adults:</td><td>THB 1,690</td></tr>
+        <tr><td>Children:</td><td>THB 1,290</td></tr>
+      </table>
+      <p style="margin-top: 8px;"><strong>Your group (${totalGuests} people): Adult THB 1,690 / Child THB 1,290</strong></p>
+    `;
+  }
+}
+
+function getPriceForTier(tierType, totalGuests) {
+  const tierList = PRICING_STRUCTURE[tierType];
+  
+  if (Array.isArray(tierList)) {
+    const tier = tierList.find(t => totalGuests >= t.min && totalGuests <= t.max);
+    return tier ? tier.price : 0;
+  } else {
+    return tierList;
+  }
+}
+
+function initializeBuffetSection() {
+  renderDishSelection();
+  updateSelectionSummary();
+}
+
+function renderDishSelection() {
+  const container = document.getElementById('dishSelection');
+  const categories = ['appetizers', 'soups', 'salads', 'mains', 'desserts'];
+  const currentCuisine = MENU_DATA[state.buffet.cuisine];
+  
+  const visibleCategories = state.buffet.tier === 'deluxe' 
+    ? categories.filter(cat => cat !== 'soups')
+    : categories;
+  
+  container.innerHTML = visibleCategories.map(category => {
+    const limit = TIER_LIMITS[state.buffet.tier][category];
+    if (limit === 0) return '';
+    
+    return `
+      <div class="category-section" data-category="${category}">
+        <div class="category-header">
+          <h3>${category.charAt(0).toUpperCase() + category.slice(1)}</h3>
+          <div class="selection-counter">
+            ${state.buffet.selectedDishes[category].length}/${limit}
+          </div>
+        </div>
+        <div class="dishes-grid">
+          ${currentCuisine[category].map(dish => {
+            const isSelected = state.buffet.selectedDishes[category].includes(dish.id);
+            const isAvailable = dish.availableIn.includes(state.buffet.tier);
+            const isDisabled = !isAvailable || (
+              !isSelected && state.buffet.selectedDishes[category].length >= limit
+            );
+            
+            return `
+              <div class="dish-card ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}" 
+                   data-category="${category}" data-dish-id="${dish.id}">
+                <img src="${dish.image}" alt="${dish.name}" class="dish-image">
+                <div class="dish-content">
+                  <div class="dish-header">
+                    <h4 class="dish-name">${dish.name}</h4>
+                    <div class="dish-tags">
+                      ${dish.tags.map(tag => `<span class="dish-tag">${tag}</span>`).join('')}
+                    </div>
+                  </div>
+                  <p class="dish-description">${dish.description}</p>
+                  <input type="checkbox" class="dish-checkbox" ${isSelected ? 'checked' : ''}>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.dish-card').forEach(card => {
+    card.addEventListener('click', function() {
+      if (this.classList.contains('disabled')) return;
+      
+      const category = this.dataset.category;
+      const dishId = this.dataset.dishId;
+      const isSelected = state.buffet.selectedDishes[category].includes(dishId);
+      
+      if (isSelected) {
+        state.buffet.selectedDishes[category] = state.buffet.selectedDishes[category].filter(id => id !== dishId);
+        this.classList.remove('selected');
+        this.querySelector('.dish-checkbox').checked = false;
+      } else {
+        if (state.buffet.selectedDishes[category].length < TIER_LIMITS[state.buffet.tier][category]) {
+          state.buffet.selectedDishes[category].push(dishId);
+          this.classList.add('selected');
+          this.querySelector('.dish-checkbox').checked = true;
+        }
+      }
+      
+      updateSelectionCounters();
+      updateSelectionSummary();
+      updateQuote();
+    });
+  });
+
+  updateSelectionSummary();
+}
+
+function updateSelectionCounters() {
+  const categories = ['appetizers', 'soups', 'salads', 'mains', 'desserts'];
+  
+  categories.forEach(category => {
+    const counter = document.querySelector(`[data-category="${category}"] .selection-counter`);
+    if (counter) {
+      counter.textContent = `${state.buffet.selectedDishes[category].length}/${TIER_LIMITS[state.buffet.tier][category]}`;
+    }
+  });
+  
+  document.querySelectorAll('.dish-card').forEach(card => {
+    const category = card.dataset.category;
+    const dishId = card.dataset.dishId;
+    const dish = MENU_DATA[state.buffet.cuisine][category].find(d => d.id === dishId);
+    const isSelected = state.buffet.selectedDishes[category].includes(dishId);
+    const isAvailable = dish.availableIn.includes(state.buffet.tier);
+    const isDisabled = !isAvailable || (
+      !isSelected && state.buffet.selectedDishes[category].length >= TIER_LIMITS[state.buffet.tier][category]
+    );
+    
+    card.classList.toggle('disabled', isDisabled && !isSelected);
+  });
+}
+
+function updateSelectionSummary() {
+  const container = document.getElementById('selectionSummary');
+  const categories = ['appetizers', 'soups', 'salads', 'mains', 'desserts'];
+  const currentCuisine = MENU_DATA[state.buffet.cuisine];
+  
+  container.innerHTML = categories.map(category => {
+    const limit = TIER_LIMITS[state.buffet.tier][category];
+    if (limit === 0) return '';
+    
+    const selectedDishes = state.buffet.selectedDishes[category]
+      .map(id => currentCuisine[category].find(dish => dish.id === id)?.name)
+      .filter(Boolean);
+    
+    return `
+      <div class="summary-category">
+        <strong>${category.charAt(0).toUpperCase() + category.slice(1)}:</strong>
+        <div class="summary-items">
+          ${selectedDishes.length > 0 
+            ? selectedDishes.map(dish => `<span class="summary-item">${dish}</span>`).join('')
+            : '<span class="summary-item" style="background: #fee2e2; color: #991b1b;">No selection</span>'
+          }
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateQuote() {
+  const adults = parseInt(document.getElementById('adults').value) || 0;
+  const children = parseInt(document.getElementById('children').value) || 0;
+  const totalGuests = adults + children;
+  
+  if (totalGuests === 0) {
+    clearQuote();
+    return;
+  }
+
+  const selectedPackage = document.querySelector('.package-card.selected').dataset.package;
+  
+  const items = [];
+  let subtotal = 0;
+  let baseCost = 0;
+
+  // Base package pricing
+  if (selectedPackage === 'gala') {
+    const galaPrice = getPriceForTier('gala', totalGuests);
+    baseCost = totalGuests * galaPrice;
+    items.push({
+      name: 'Gala Dinner',
+      quantity: totalGuests,
+      total: baseCost,
+      unitPrice: galaPrice
+    });
+  } else if (selectedPackage === 'day') {
+    const adultPrice = getPriceForTier('dayAdult', totalGuests);
+    const childPrice = getPriceForTier('dayChild', totalGuests);
+    baseCost = (adults * adultPrice) + (children * childPrice);
+    items.push({
+      name: 'Day Pass',
+      quantity: totalGuests,
+      total: baseCost,
+      adultPrice: adultPrice,
+      childPrice: childPrice
+    });
+  } else if (selectedPackage === 'school') {
+    const adultPrice = getPriceForTier('schoolAdult', totalGuests);
+    const childPrice = getPriceForTier('schoolChild', totalGuests);
+    baseCost = (adults * adultPrice) + (children * childPrice);
+    items.push({
+      name: 'School Day',
+      quantity: totalGuests,
+      total: baseCost,
+      adultPrice: adultPrice,
+      childPrice: childPrice
+    });
+  } else if (selectedPackage === 'vip') {
+    const adultPrice = PRICING_STRUCTURE.vip.adult;
+    const childPrice = PRICING_STRUCTURE.vip.child;
+    baseCost = (adults * adultPrice) + (children * childPrice);
+    items.push({
+      name: 'VIP Hosted',
+      quantity: totalGuests,
+      total: baseCost,
+      adultPrice: adultPrice,
+      childPrice: childPrice
+    });
+  }
+  
+  subtotal += baseCost;
+
+  // Buffet
+  if (state.addons.buffet) {
+    const buffetCost = totalGuests * state.buffet.price;
+    items.push({
+      name: `Buffet (${state.buffet.tier} - ${state.buffet.cuisine})`,
+      quantity: totalGuests,
+      total: buffetCost,
+      unitPrice: state.buffet.price
+    });
+    subtotal += buffetCost;
+  }
+
+  // Other add-ons
+  if (state.addons.meal) {
+    const mealValue = parseInt(document.getElementById('mealValue').value);
+    const mealCost = totalGuests * mealValue;
+    items.push({
+      name: 'Meal Vouchers',
+      quantity: totalGuests,
+      total: mealCost,
+      unitPrice: mealValue
+    });
+    subtotal += mealCost;
+  }
+
+  if (state.addons.cabanas) {
+    const cabanaCount = parseInt(document.getElementById('cabanaCount').value) || 0;
+    const cabanaCost = cabanaCount * 1800;
+    items.push({
+      name: 'Private Cabanas',
+      quantity: cabanaCount,
+      total: cabanaCost,
+      unitPrice: 1800
+    });
+    subtotal += cabanaCost;
+  }
+
+  if (state.addons.transfer) {
+    const transferCost = parseInt(document.getElementById('coachCount').value);
+    items.push({
+      name: 'Coach Transfer',
+      quantity: 1,
+      total: transferCost
+    });
+    subtotal += transferCost;
+  }
+
+  if (state.addons.photo) {
+    const photoCost = parseInt(document.getElementById('photoPackage').value);
+    items.push({
+      name: 'Event Photographer',
+      quantity: 1,
+      total: photoCost
+    });
+    subtotal += photoCost;
+  }
+
+  // DJ add-on
+  if (state.addons.dj) {
+    const djCost = 20000;
+    items.push({
+      name: 'DJ Service',
+      quantity: 1,
+      total: djCost
+    });
+    subtotal += djCost;
+  }
+
+  // Apply discount (only if not already discounted through tiered pricing)
+  let discount = 0;
+  const discounts = [
+    { min: 500, percent: 0.15 },
+    { min: 250, percent: 0.10 },
+    { min: 100, percent: 0.05 }
+  ];
+  
+  for (const tier of discounts) {
+    if (totalGuests >= tier.min && selectedPackage !== 'gala' && selectedPackage !== 'school') {
+      discount = subtotal * tier.percent;
+      break;
+    }
+  }
+
+  const afterDiscount = subtotal - discount;
+  
+  // Apply agent markup
+  const markupAmount = afterDiscount * (state.agentMarkup / 100);
+  const afterMarkup = afterDiscount + markupAmount;
+  
+  // Calculate VAT
+  const vat = afterMarkup * 0.07;
+  const total = afterMarkup + vat;
+
+  // Store items for later use
+  quoteData = {
+    items,
+    subtotal,
+    discount,
+    markupAmount,
+    afterMarkup,
+    vat,
+    total,
+    guests: totalGuests,
+    adults,
+    children,
+    selectedPackage
+  };
+
+  // Update display
+  updateQuoteDisplay(items, subtotal, discount, markupAmount, vat, total, totalGuests);
+}
+
+function updateQuoteDisplay(items, subtotal, discount, markupAmount, vat, total, guests) {
+  const quoteItems = document.getElementById('quoteItems');
+  
+  if (items.length === 0) {
+    quoteItems.innerHTML = `
+      <tr>
+        <td colspan="3" style="text-align:center;color:#64748b">
+          Enter guest count to see pricing
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  quoteItems.innerHTML = items.map(item => {
+    if (item.adultPrice && item.childPrice) {
+      return `
+        <tr>
+          <td>${item.name}<br><small style="color:#64748b">Adult: ${formatCurrency(item.adultPrice)} | Child: ${formatCurrency(item.childPrice)}</small></td>
+          <td>${item.quantity}</td>
+          <td>${formatCurrency(item.total)}</td>
+        </tr>
+      `;
+    } else if (item.unitPrice) {
+      return `
+        <tr>
+          <td>${item.name}<br><small style="color:#64748b">${formatCurrency(item.unitPrice)}/person</small></td>
+          <td>${item.quantity}</td>
+          <td>${formatCurrency(item.total)}</td>
+        </tr>
+      `;
+    } else {
+      return `
+        <tr>
+          <td>${item.name}</td>
+          <td>${item.quantity}</td>
+          <td>${formatCurrency(item.total)}</td>
+        </tr>
+      `;
+    }
+  }).join('');
+
+  document.getElementById('subtotal').innerHTML = `<strong>${formatCurrency(subtotal)}</strong>`;
+  document.getElementById('discount').textContent = discount ? `-${formatCurrency(discount)}` : '—';
+  document.getElementById('markupAmount').textContent = `+${formatCurrency(markupAmount)}`;
+  document.getElementById('vat').textContent = formatCurrency(vat);
+  document.getElementById('total').innerHTML = `<strong>${formatCurrency(total)}</strong>`;
+  document.getElementById('perPerson').textContent = formatCurrency(total / Math.max(guests, 1));
+  document.getElementById('commission').textContent = formatCurrency(markupAmount);
+  
+  // Show/hide markup row
+  const markupRow = document.getElementById('markupRow');
+  markupRow.style.display = markupAmount > 0 ? 'table-row' : 'none';
+}
+
+function clearQuote() {
+  document.getElementById('quoteItems').innerHTML = `
+    <tr>
+      <td colspan="3" style="text-align:center;color:#64748b">
+        Enter guest count to see pricing
+      </td>
+    </tr>
+  `;
+  document.getElementById('subtotal').textContent = '—';
+  document.getElementById('discount').textContent = '—';
+  document.getElementById('vat').textContent = '—';
+  document.getElementById('total').textContent = '—';
+  document.getElementById('perPerson').textContent = '—';
+}
+
+function getPackageName(type) {
+  const names = {
+    day: 'Day Pass',
+    vip: 'VIP Hosted', 
+    school: 'School Day',
+    gala: 'Gala Dinner'
+  };
+  return names[type] || 'Package';
+}
+
+function formatCurrency(amount) {
+  return 'THB ' + Math.round(amount).toLocaleString();
+}
+
+function generateQuotePreview() {
+  const adults = parseInt(document.getElementById('adults').value) || 0;
+  const children = parseInt(document.getElementById('children').value) || 0;
+  const totalGuests = adults + children;
+  const eventDate = document.getElementById('eventDate').value;
+  const arrivalTime = document.getElementById('arrivalTime').value;
+  const selectedPackage = getPackageName(document.querySelector('.package-card.selected').dataset.package);
+  
+  if (totalGuests === 0) {
+    alert('Please enter the number of guests first');
+    return;
+  }
+
+  let buffetDetails = '';
+  if (state.addons.buffet) {
+    const categories = ['appetizers', 'soups', 'salads', 'mains', 'desserts'];
+    const currentCuisine = MENU_DATA[state.buffet.cuisine];
+    
+    buffetDetails = `\nBUFFET SELECTION:\n`;
+    buffetDetails += `Cuisine: ${state.buffet.cuisine.charAt(0).toUpperCase() + state.buffet.cuisine.slice(1)}\n`;
+    buffetDetails += `Tier: ${state.buffet.tier.charAt(0).toUpperCase() + state.buffet.tier.slice(1)}\n`;
+    buffetDetails += `Price: ${formatCurrency(state.buffet.price)} per guest\n\n`;
+    
+    categories.forEach(category => {
+      const selectedDishes = state.buffet.selectedDishes[category];
+      if (selectedDishes.length > 0) {
+        buffetDetails += `${category.charAt(0).toUpperCase() + category.slice(1)}:\n`;
+        selectedDishes.forEach(dishId => {
+          const dish = currentCuisine[category].find(d => d.id === dishId);
+          if (dish) {
+            buffetDetails += `  • ${dish.name}\n`;
+          }
+        });
+        buffetDetails += '\n';
+      }
+    });
+  }
+
+  let addonsDetails = '';
+  if (state.addons.meal) {
+    const mealValue = parseInt(document.getElementById('mealValue').value);
+    addonsDetails += `Meal Vouchers: ${formatCurrency(mealValue)} per person\n`;
+  }
+  if (state.addons.cabanas) {
+    const cabanaCount = parseInt(document.getElementById('cabanaCount').value) || 0;
+    addonsDetails += `Private Cabanas: ${cabanaCount} units\n`;
+  }
+  if (state.addons.transfer) {
+    const transferCost = parseInt(document.getElementById('coachCount').value);
+    addonsDetails += `Coach Transfer: ${formatCurrency(transferCost)}\n`;
+  }
+  if (state.addons.photo) {
+    const photoCost = parseInt(document.getElementById('photoPackage').value);
+    addonsDetails += `Event Photographer: ${formatCurrency(photoCost)}\n`;
+  }
+  if (state.addons.dj) {
+    addonsDetails += `DJ Service: ${formatCurrency(20000)}\n`;
+  }
+
+  const quoteText = `
+AQUAVERSE OFFICIAL QUOTATION
+====================================
+
+AGENT INFORMATION:
+Agent: ${state.agentName}
+Agency: ${state.agencyName}
+Client: ${state.clientName}
+Date: ${new Date().toLocaleDateString()}
+Quote Reference: ${document.getElementById('quoteRef').textContent}
+
+EVENT DETAILS:
+Date: ${eventDate}
+Time: ${arrivalTime}
+Package: ${selectedPackage}
+Adults: ${adults}
+Children: ${children}
+Total Guests: ${totalGuests}
+
+${buffetDetails}
+ADDITIONAL SERVICES:
+${addonsDetails || 'None selected'}
+
+PRICING SUMMARY:
+${quoteData.items ? quoteData.items.map(item => {
+  if (item.adultPrice && item.childPrice) {
+    return `${item.name.padEnd(30)} ${item.quantity.toString().padStart(4)} ${formatCurrency(item.total).padStart(15)}`;
+  } else {
+    return `${item.name.padEnd(30)} ${item.quantity.toString().padStart(4)} ${formatCurrency(item.total).padStart(15)}`;
+  }
+}).join('\n') : ''}
+
+Subtotal: ${formatCurrency(quoteData.subtotal).padStart(49)}
+${quoteData.discount > 0 ? `Volume Discount: -${formatCurrency(quoteData.discount).padStart(37)}\n` : ''}
+${state.agentMarkup > 0 ? `Agent Service Fee (${state.agentMarkup}%): +${formatCurrency(quoteData.markupAmount).padStart(30)}\n` : ''}
+VAT (7%): ${formatCurrency(quoteData.vat).padStart(49)}
+====================================
+TOTAL AMOUNT: ${formatCurrency(quoteData.total).padStart(40)}
+
+Per Person Cost: ${formatCurrency(quoteData.total / Math.max(totalGuests, 1))}
+${state.agentMarkup > 0 ? `Agent Commission: ${formatCurrency(quoteData.markupAmount)}` : ''}
+
+TERMS & CONDITIONS:
+• This quotation is valid for 30 days
+• 50% deposit required to confirm booking
+• Final numbers required 7 days prior to event
+• Prices subject to 7% VAT
+• Cancellation policy applies
+
+For questions, contact your agent ${state.agentName} at ${state.agencyName}
+  `.trim();
+
+  const preview = document.getElementById('quotePreview');
+  const previewContent = document.getElementById('quotePreviewContent');
+  previewContent.textContent = quoteText;
+  preview.classList.remove('hidden');
+  
+  // Scroll to preview
+  preview.scrollIntoView({ behavior: 'smooth' });
+}
+
+/** Ensures the browser actually paints before html2canvas snapshots (prevents blank PDFs). */
+function waitForNextPaint() {
+  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+/** Optional: wait for images inside container to finish (prevents missing images; does NOT cause blank pages). */
+function waitForImages(container, timeoutMs = 3000) {
+  const imgs = Array.from(container.querySelectorAll('img'));
+  if (imgs.length === 0) return Promise.resolve();
+
+  const pending = imgs.filter(img => !(img.complete && img.naturalWidth > 0));
+  if (pending.length === 0) return Promise.resolve();
+
+  return new Promise(resolve => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+
+    const timer = setTimeout(finish, timeoutMs);
+
+    let remaining = pending.length;
+    const dec = () => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearTimeout(timer);
+        finish();
+      }
+    };
+
+    pending.forEach(img => {
+      img.addEventListener('load', dec, { once: true });
+      img.addEventListener('error', dec, { once: true });
+    });
+  });
+}
+
+async function downloadPDF() {
+  const adults   = parseInt(document.getElementById('adults')?.value, 10)   || 0;
+  const children = parseInt(document.getElementById('children')?.value, 10) || 0;
+  const total    = adults + children;
+
+  if (!total) { alert('Enter guests first'); return; }
+
+  updateQuote();                                                       // refresh numbers
+  const JSD = window.jsPDF || window.jspdf?.jsPDF;                     // pick library
+  if (!JSD)  { alert('jsPDF not loaded');  return; }
+
+  const doc  = new JSD({ orientation:'p', unit:'pt', format:'a4' });
+  const marg = 40;
+  const wid  = doc.internal.pageSize.getWidth() - 2*marg;
+  let y      = 60;
+
+  doc.setFontSize(18);
+  doc.setFont(undefined,'bold');
+  doc.text('Aquaverse Quotation', marg, y);  y+=30;
+
+  doc.setFontSize(10);
+  doc.setFont(undefined,'normal');
+
+  const line = (txt, size=10, bold=false, spacing=12) => {
+     doc.setFontSize(size);
+     if (bold) doc.setFont(undefined,'bold'); else doc.setFont(undefined,'normal');
+     const split = doc.splitTextToSize(txt, wid);
+     doc.text(split, marg, y);
+     y += split.length * spacing;
+  };
+
+  /* ---- header data ---- */
+  line(`Agent : ${state.agentName}`);
+  line(`Agency: ${state.agencyName}`);
+  line(`Client: ${state.clientName}`);
+  line(`Date  : ${new Date().toLocaleDateString()}`);  y+=10;
+  line(`Event Date : ${document.getElementById('eventDate').value}`);
+  line(`Arrival    : ${document.getElementById('arrivalTime').value}`);
+  line(`Package    : ${getPackageName(document.querySelector('.package-card.selected').dataset.package)}`);
+  line(`Adults     : ${adults}`);
+  line(`Children   : ${children}`);
+  line(`Total Guests: ${total}`);  y+=10;
+
+  /* ---- items ---- */
+  doc.setFont(undefined,'bold');
+  line('Items', 11);  y-=5;
+  doc.setFont(undefined,'normal');
+
+  (quoteData.items || []).forEach(it => {
+     const name  = it.name || 'Item';
+     const qty   = it.quantity ?? '';
+     const price = 'THB ' + (Math.round(it.total||0)).toLocaleString();
+     line(`${name}  (Qty ${qty})  ${price}`);
+  });
+
+  /* ---- totals ---- */
+  y+=10;
+  line(`Subtotal : THB ${(Math.round(quoteData.subtotal||0)).toLocaleString()}`, 10, true);
+  if (quoteData.discount)
+     line(`Discount : -THB ${(Math.round(quoteData.discount)).toLocaleString()}`, 10, false);
+  if (state.agentMarkup)
+     line(`Agent fee (${state.agentMarkup}%) : +THB ${(Math.round(quoteData.markupAmount||0)).toLocaleString()}`, 10, false);
+  line(`VAT (7%) : THB ${(Math.round(quoteData.vat||0)).toLocaleString()}`, 10, false);
+  line(`TOTAL : THB ${(Math.round(quoteData.total||0)).toLocaleString()}`, 12, true);  y+=15;
+  line(`Per person : THB ${(Math.round(quoteData.total/total||0)).toLocaleString()}`);
+
+  /* ---- T&C ---- */
+  y+=20;
+  line('Terms & conditions:', 10, true);
+  line('• Valid 30 days • 50 % deposit required • Final numbers 7 days prior • Prices inc. 7 % VAT • Cancellation policy applies');
+
+  doc.save(`Aquaverse_Quote_${document.getElementById('quoteRef').textContent}.pdf`);
+}
+function sendEmail() {
+  const adults = parseInt(document.getElementById('adults').value) || 0;
+  const children = parseInt(document.getElementById('children').value) || 0;
+  const totalGuests = adults + children;
+  
+  if (totalGuests === 0) {
+    alert('Please enter the number of guests first');
+    return;
+  }
+
+  const subject = `Aquaverse Quotation - ${document.getElementById('quoteRef').textContent} - ${state.clientName}`;
+  
+  let body = `Dear ${state.clientName},\n\n`;
+  body += `Please find attached your quotation for Aquaverse.\n\n`;
+  body += `Event Details:\n`;
+  body += `- Date: ${document.getElementById('eventDate').value}\n`;
+  body += `- Time: ${document.getElementById('arrivalTime').value}\n`;
+  body += `- Package: ${getPackageName(document.querySelector('.package-card.selected').dataset.package)}\n`;
+  body += `- Guests: ${adults} adults, ${children} children (Total: ${totalGuests})\n\n`;
+  body += `Total Amount: ${document.getElementById('total').textContent}\n`;
+  body += `Per Person: ${document.getElementById('perPerson').textContent}\n\n`;
+  body += `Please review the attached PDF for full details.\n\n`;
+  body += `Best regards,\n`;
+  body += `${state.agentName}\n`;
+  body += `${state.agencyName}\n`;
+
+  const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailtoLink;
+}
+</script>
+
+</body>
+</html>
