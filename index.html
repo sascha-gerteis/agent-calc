@@ -455,8 +455,6 @@
       }
     }
   </style>
-  <!-- html2pdf library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
   <div class="calculator-container">
@@ -523,9 +521,9 @@
               <p>10:00–17:00 park access</p>
               <div style="margin-top: 8px; font-size: 14px; color: var(--muted);">Tiered pricing based on group size</div>
             </div>
-            <div class="package-card" data-package="vip">
-              <input type="radio" name="package" value="vip">
-              <h4>VIP Hosted</h4>
+            <div class="package-card" data-package="poolparty">
+              <input type="radio" name="package" value="poolparty">
+              <h4>Pool Party</h4>
               <p>Priority hosting + Cabana</p>
               <div style="margin-top: 8px; font-size: 14px; color: var(--muted);">From THB 1,690 adult / 1,290 child</div>
             </div>
@@ -742,7 +740,7 @@
   <!-- Hidden PDF Content Container -->
   <div id="pdf-content" style="display: none;"></div>
 
-<script >
+<script>
 // Menu Data
 const MENU_DATA = {
   indian: {
@@ -1437,7 +1435,7 @@ const PRICING_STRUCTURE = {
     { min: 2000, max: Infinity, price: 587 }
   ],
   
-  vip: { adult: 1690, child: 1290 }
+  poolparty: { adult: 1690, child: 1290 }
 };
 
 // State management
@@ -1658,9 +1656,9 @@ function updatePricingInfo() {
       </table>
       <p style="margin-top: 8px;"><strong>Your group (${totalGuests} people): Adult THB ${adultPrice} / Child THB ${childPrice}</strong></p>
     `;
-  } else if (selectedPackage === 'vip') {
+  } else if (selectedPackage === 'poolparty') {
     infoContainer.innerHTML = `
-      <h4>VIP Hosted Pricing</h4>
+      <h4>Pool Party Pricing</h4>
       <p>Fixed pricing regardless of group size:</p>
       <table>
         <tr><td>Adults:</td><td>THB 1,690</td></tr>
@@ -1866,12 +1864,12 @@ function updateQuote() {
       adultPrice: adultPrice,
       childPrice: childPrice
     });
-  } else if (selectedPackage === 'vip') {
-    const adultPrice = PRICING_STRUCTURE.vip.adult;
-    const childPrice = PRICING_STRUCTURE.vip.child;
+  } else if (selectedPackage === 'poolparty') {
+    const adultPrice = PRICING_STRUCTURE.poolparty.adult;
+    const childPrice = PRICING_STRUCTURE.poolparty.child;
     baseCost = (adults * adultPrice) + (children * childPrice);
     items.push({
-      name: 'VIP Hosted',
+      name: 'Pool Party',
       quantity: totalGuests,
       total: baseCost,
       adultPrice: adultPrice,
@@ -2066,7 +2064,7 @@ function clearQuote() {
 function getPackageName(type) {
   const names = {
     day: 'Day Pass',
-    vip: 'VIP Hosted', 
+    poolparty: 'Pool Party', 
     school: 'School Day',
     gala: 'Gala Dinner'
   };
@@ -2197,114 +2195,339 @@ For questions, contact your agent ${state.agentName} at ${state.agencyName}
   preview.scrollIntoView({ behavior: 'smooth' });
 }
 
-/** Ensures the browser actually paints before html2canvas snapshots (prevents blank PDFs). */
-function waitForNextPaint() {
-  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-}
+async function downloadPDF() {
+  const adults = parseInt(document.getElementById('adults').value) || 0;
+  const children = parseInt(document.getElementById('children').value) || 0;
+  const totalGuests = adults + children;
 
-/** Optional: wait for images inside container to finish (prevents missing images; does NOT cause blank pages). */
-function waitForImages(container, timeoutMs = 3000) {
-  const imgs = Array.from(container.querySelectorAll('img'));
-  if (imgs.length === 0) return Promise.resolve();
+  if (!totalGuests) {
+    alert('Please enter the number of guests first');
+    return;
+  }
 
-  const pending = imgs.filter(img => !(img.complete && img.naturalWidth > 0));
-  if (pending.length === 0) return Promise.resolve();
+  updateQuote(); // Refresh all calculations
+  
+  try {
+    const JSD = window.jsPDF || window.jspdf?.jsPDF;
+    if (!JSD) {
+      alert('jsPDF library not loaded');
+      return;
+    }
 
-  return new Promise(resolve => {
-    let done = false;
-    const finish = () => { if (!done) { done = true; resolve(); } };
-
-    const timer = setTimeout(finish, timeoutMs);
-
-    let remaining = pending.length;
-    const dec = () => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearTimeout(timer);
-        finish();
+    const doc = new JSD({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    let yPos = margin;
+    
+    // Add logo - using the provided image URL
+    try {
+      // Use the provided logo URL
+    const logoSize = 30;
+doc.addImage('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRI5KegM40zrf1Pf3dpNvvd4BNUylNWXESx3Q&s', 
+             'JPEG', margin, yPos, logoSize, logoSize);
+yPos += logoSize + 5;
+    } catch (e) {
+      // If logo fails, use text
+      console.log('Logo not loaded, using text instead:', e);
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(37, 99, 235);
+      doc.text('AQUAVERSE', margin, yPos + 10);
+    }
+    
+    // Agency info on right
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${state.agencyName}`, pageWidth - margin - 40, yPos + 5, { align: 'right' });
+    doc.text(`Agent: ${state.agentName}`, pageWidth - margin - 40, yPos + 10, { align: 'right' });
+    
+    yPos += 25;
+    
+    // Title
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(37, 99, 235);
+    doc.text('OFFICIAL QUOTATION', margin, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Ref: ${document.getElementById('quoteRef').textContent}`, margin, yPos);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - margin, yPos, { align: 'right' });
+    yPos += 15;
+    
+    // Client Information
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('CLIENT INFORMATION', margin, yPos);
+    yPos += 7;
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Client: ${state.clientName}`, margin, yPos);
+    doc.text(`Event Date: ${document.getElementById('eventDate').value}`, pageWidth/2, yPos);
+    yPos += 5;
+    doc.text(`Agent: ${state.agentName}`, margin, yPos);
+    doc.text(`Time: ${document.getElementById('arrivalTime').value}`, pageWidth/2, yPos);
+    yPos += 10;
+    
+    // Event Summary
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('EVENT SUMMARY', margin, yPos);
+    yPos += 7;
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    const selectedPackage = getPackageName(document.querySelector('.package-card.selected').dataset.package);
+    doc.text(`Package: ${selectedPackage}`, margin, yPos);
+    doc.text(`Adults: ${adults}`, margin + 60, yPos);
+    doc.text(`Children: ${children}`, margin + 100, yPos);
+    doc.text(`Total Guests: ${totalGuests}`, margin + 150, yPos);
+    yPos += 10;
+    
+    // Check if we need to add new page for space
+    const checkPageBreak = (requiredHeight) => {
+      if (yPos + requiredHeight > doc.internal.pageSize.getHeight() - margin) {
+        doc.addPage();
+        yPos = margin;
       }
     };
-
-    pending.forEach(img => {
-      img.addEventListener('load', dec, { once: true });
-      img.addEventListener('error', dec, { once: true });
+    
+    // Add-ons Section
+    checkPageBreak(50);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('ADD-ONS & SERVICES', margin, yPos);
+    yPos += 7;
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    
+    let addonsCount = 0;
+    
+    // Buffet details
+    if (state.addons.buffet) {
+      doc.setFont(undefined, 'bold');
+      doc.text(`Buffet (${state.buffet.tier.charAt(0).toUpperCase() + state.buffet.tier.slice(1)} - ${state.buffet.cuisine.charAt(0).toUpperCase() + state.buffet.cuisine.slice(1)})`, margin, yPos);
+      doc.setFont(undefined, 'normal');
+      yPos += 5;
+      doc.text(`Price: ${formatCurrency(state.buffet.price)} per guest`, margin + 5, yPos);
+      yPos += 5;
+      
+      // Display selected dishes
+      const categories = ['appetizers', 'soups', 'salads', 'mains', 'desserts'];
+      const currentCuisine = MENU_DATA[state.buffet.cuisine];
+      
+      categories.forEach(category => {
+        const selectedDishes = state.buffet.selectedDishes[category];
+        if (selectedDishes.length > 0) {
+          checkPageBreak(20);
+          doc.setFont(undefined, 'bold');
+          doc.text(`${category.charAt(0).toUpperCase() + category.slice(1)}:`, margin + 10, yPos);
+          yPos += 4;
+          doc.setFont(undefined, 'normal');
+          
+          selectedDishes.forEach(dishId => {
+            const dish = currentCuisine[category].find(d => d.id === dishId);
+            if (dish) {
+              checkPageBreak(5);
+              doc.text(`• ${dish.name}`, margin + 15, yPos);
+              yPos += 4;
+            }
+          });
+          yPos += 2;
+        }
+      });
+      yPos += 5;
+      addonsCount++;
+    }
+    
+    // Other add-ons
+    const addonsList = [];
+    if (state.addons.meal) {
+      const mealValue = parseInt(document.getElementById('mealValue').value);
+      addonsList.push(`Meal Vouchers: ${formatCurrency(mealValue)} per person`);
+      addonsCount++;
+    }
+    if (state.addons.cabanas) {
+      const cabanaCount = parseInt(document.getElementById('cabanaCount').value) || 0;
+      addonsList.push(`Private Cabanas: ${cabanaCount} units @ ${formatCurrency(1800)} each`);
+      addonsCount++;
+    }
+    if (state.addons.transfer) {
+      const transferCost = parseInt(document.getElementById('coachCount').value);
+      addonsList.push(`Coach Transfer: ${formatCurrency(transferCost)}`);
+      addonsCount++;
+    }
+    if (state.addons.photo) {
+      const photoCost = parseInt(document.getElementById('photoPackage').value);
+      addonsList.push(`Event Photographer: ${formatCurrency(photoCost)}`);
+      addonsCount++;
+    }
+    if (state.addons.dj) {
+      addonsList.push(`DJ Service: ${formatCurrency(20000)}`);
+      addonsCount++;
+    }
+    
+    if (addonsList.length > 0) {
+      addonsList.forEach(item => {
+        checkPageBreak(5);
+        doc.text(`• ${item}`, margin, yPos);
+        yPos += 5;
+      });
+    } else if (addonsCount === 0) {
+      doc.text('No additional services selected', margin, yPos);
+      yPos += 5;
+    }
+    
+    yPos += 10;
+    
+    // Pricing Details Table
+    checkPageBreak(100);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('PRICING DETAILS', margin, yPos);
+    yPos += 7;
+    
+    // Table header
+    doc.setFillColor(37, 99, 235);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(margin, yPos, pageWidth - (2 * margin), 8, 'F');
+    doc.text('ITEM', margin + 2, yPos + 5);
+    doc.text('QTY', margin + 110, yPos + 5);
+    doc.text('PRICE', pageWidth - margin - 20, yPos + 5, { align: 'right' });
+    yPos += 10;
+    
+    // Table rows
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+    
+    if (quoteData.items && quoteData.items.length > 0) {
+      quoteData.items.forEach((item, index) => {
+        checkPageBreak(7);
+        // Alternate row colors
+        if (index % 2 === 0) {
+          doc.setFillColor(240, 240, 240);
+          doc.rect(margin, yPos - 2, pageWidth - (2 * margin), 7, 'F');
+        }
+        
+        // Truncate long item names
+        let itemName = item.name;
+        if (itemName.length > 40) {
+          itemName = itemName.substring(0, 37) + '...';
+        }
+        
+        doc.text(itemName, margin + 2, yPos + 3);
+        doc.text(item.quantity.toString(), margin + 110, yPos + 3);
+        doc.text(formatCurrency(item.total), pageWidth - margin - 2, yPos + 3, { align: 'right' });
+        yPos += 7;
+      });
+    }
+    
+    yPos += 5;
+    
+    // Subtotals
+    checkPageBreak(40);
+    const subtotalX = pageWidth - margin - 100;
+    
+    doc.setFont(undefined, 'bold');
+    doc.text('Subtotal:', subtotalX, yPos);
+    doc.text(formatCurrency(quoteData.subtotal), pageWidth - margin - 2, yPos, { align: 'right' });
+    yPos += 6;
+    
+    if (quoteData.discount > 0) {
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(0, 150, 0);
+      doc.text('Volume Discount:', subtotalX, yPos);
+      doc.text(`-${formatCurrency(quoteData.discount)}`, pageWidth - margin - 2, yPos, { align: 'right' });
+      yPos += 6;
+      doc.setTextColor(0, 0, 0);
+    }
+    
+    if (state.agentMarkup > 0) {
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(139, 92, 246);
+      doc.text(`Agent Service Fee (${state.agentMarkup}%):`, subtotalX, yPos);
+      doc.text(`+${formatCurrency(quoteData.markupAmount)}`, pageWidth - margin - 2, yPos, { align: 'right' });
+      yPos += 6;
+      doc.setTextColor(0, 0, 0);
+    }
+    
+    doc.setFont(undefined, 'normal');
+    doc.text('VAT (7%):', subtotalX, yPos);
+    doc.text(formatCurrency(quoteData.vat), pageWidth - margin - 2, yPos, { align: 'right' });
+    yPos += 8;
+    
+    // Total
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(37, 99, 235);
+    doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
+    doc.text('TOTAL:', subtotalX, yPos + 5);
+    doc.text(formatCurrency(quoteData.total), pageWidth - margin - 2, yPos + 5, { align: 'right' });
+    yPos += 12;
+    
+    // Per person and commission
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Per Person: ${formatCurrency(quoteData.total / Math.max(totalGuests, 1))}`, margin, yPos);
+    
+    if (state.agentMarkup > 0) {
+      doc.text(`Agent Commission: ${formatCurrency(quoteData.markupAmount)}`, pageWidth - margin - 2, yPos, { align: 'right' });
+    }
+    
+    yPos += 15;
+    
+    // Terms and Conditions
+    checkPageBreak(50);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('TERMS & CONDITIONS', margin, yPos);
+    yPos += 6;
+    
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    const terms = [
+      '• This quotation is valid for 30 days from the date of issue',
+      '• 50% deposit required to confirm booking',
+      '• Final guest numbers must be confirmed 7 days prior to event',
+      '• Prices are subject to 7% VAT as applicable',
+      '• Cancellation policy applies according to Aquaverse terms',
+      '• Any changes to the menu or services must be confirmed 14 days in advance',
+      '• Outdoor events are subject to weather conditions'
+    ];
+    
+    terms.forEach(term => {
+      checkPageBreak(5);
+      doc.text(term, margin + 5, yPos);
+      yPos += 4;
     });
-  });
+    
+    yPos += 10;
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Thank you for choosing Aquaverse!', margin, yPos);
+    doc.text('For questions, contact your agent or email agents@aquaverse.com', margin, yPos + 4);
+    
+    // Save the PDF
+    doc.save(`Aquaverse_Quote_${document.getElementById('quoteRef').textContent}.pdf`);
+    
+    // Show success message
+    alert('PDF generated successfully with all details included!');
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Error generating PDF. Please try again.');
+  }
 }
 
-async function downloadPDF() {
-  const adults   = parseInt(document.getElementById('adults')?.value, 10)   || 0;
-  const children = parseInt(document.getElementById('children')?.value, 10) || 0;
-  const total    = adults + children;
-
-  if (!total) { alert('Enter guests first'); return; }
-
-  updateQuote();                                                       // refresh numbers
-  const JSD = window.jsPDF || window.jspdf?.jsPDF;                     // pick library
-  if (!JSD)  { alert('jsPDF not loaded');  return; }
-
-  const doc  = new JSD({ orientation:'p', unit:'pt', format:'a4' });
-  const marg = 40;
-  const wid  = doc.internal.pageSize.getWidth() - 2*marg;
-  let y      = 60;
-
-  doc.setFontSize(18);
-  doc.setFont(undefined,'bold');
-  doc.text('Aquaverse Quotation', marg, y);  y+=30;
-
-  doc.setFontSize(10);
-  doc.setFont(undefined,'normal');
-
-  const line = (txt, size=10, bold=false, spacing=12) => {
-     doc.setFontSize(size);
-     if (bold) doc.setFont(undefined,'bold'); else doc.setFont(undefined,'normal');
-     const split = doc.splitTextToSize(txt, wid);
-     doc.text(split, marg, y);
-     y += split.length * spacing;
-  };
-
-  /* ---- header data ---- */
-  line(`Agent : ${state.agentName}`);
-  line(`Agency: ${state.agencyName}`);
-  line(`Client: ${state.clientName}`);
-  line(`Date  : ${new Date().toLocaleDateString()}`);  y+=10;
-  line(`Event Date : ${document.getElementById('eventDate').value}`);
-  line(`Arrival    : ${document.getElementById('arrivalTime').value}`);
-  line(`Package    : ${getPackageName(document.querySelector('.package-card.selected').dataset.package)}`);
-  line(`Adults     : ${adults}`);
-  line(`Children   : ${children}`);
-  line(`Total Guests: ${total}`);  y+=10;
-
-  /* ---- items ---- */
-  doc.setFont(undefined,'bold');
-  line('Items', 11);  y-=5;
-  doc.setFont(undefined,'normal');
-
-  (quoteData.items || []).forEach(it => {
-     const name  = it.name || 'Item';
-     const qty   = it.quantity ?? '';
-     const price = 'THB ' + (Math.round(it.total||0)).toLocaleString();
-     line(`${name}  (Qty ${qty})  ${price}`);
-  });
-
-  /* ---- totals ---- */
-  y+=10;
-  line(`Subtotal : THB ${(Math.round(quoteData.subtotal||0)).toLocaleString()}`, 10, true);
-  if (quoteData.discount)
-     line(`Discount : -THB ${(Math.round(quoteData.discount)).toLocaleString()}`, 10, false);
-  if (state.agentMarkup)
-     line(`Agent fee (${state.agentMarkup}%) : +THB ${(Math.round(quoteData.markupAmount||0)).toLocaleString()}`, 10, false);
-  line(`VAT (7%) : THB ${(Math.round(quoteData.vat||0)).toLocaleString()}`, 10, false);
-  line(`TOTAL : THB ${(Math.round(quoteData.total||0)).toLocaleString()}`, 12, true);  y+=15;
-  line(`Per person : THB ${(Math.round(quoteData.total/total||0)).toLocaleString()}`);
-
-  /* ---- T&C ---- */
-  y+=20;
-  line('Terms & conditions:', 10, true);
-  line('• Valid 30 days • 50 % deposit required • Final numbers 7 days prior • Prices inc. 7 % VAT • Cancellation policy applies');
-
-  doc.save(`Aquaverse_Quote_${document.getElementById('quoteRef').textContent}.pdf`);
-}
 function sendEmail() {
   const adults = parseInt(document.getElementById('adults').value) || 0;
   const children = parseInt(document.getElementById('children').value) || 0;
